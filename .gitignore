@@ -1,0 +1,5 @@
+*.tar
+*.csv
+*.jpg
+*.ckpt
+*.pyc
