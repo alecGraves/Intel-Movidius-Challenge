@@ -5,6 +5,9 @@ import tensorflow as tf
 from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
 slim = tf.contrib.slim
 
+# data tool
+import datatool
+
 # model specific info
 from incepv4.inception_v4 import inception_v4
 from incepv4.inception_utils import inception_arg_scope as scope
@@ -19,8 +22,8 @@ def rebuild_incepv4(input_shape=[1, size, size, 3], training=False):
         vars_to_restore = slim.get_variables_to_restore()
 
     # save the op used to restore weights from checkpoint
-    restore_op = tf.train.Saver(vars_to_restore)
-    return restore_op, end_points
+    restore_op = tf.train.Saver(vars_to_restore).restore
+    return input_layer, restore_op, end_points
 
 def add_fine_tuning_parts(end_points, num_classes=200):
     # grab the network output
@@ -32,7 +35,7 @@ def add_fine_tuning_parts(end_points, num_classes=200):
     with tf.variable_scope('FineTuning'):
         logits = slim.fully_connected(flattened, num_classes, activation_fn=None,
                                         scope='FineTuning')
-        predictions = tf.nn.softmax(logits, name='Predictions')
+        predictions = tf.nn.softmax(logits, name='PredictionsFine')
 
     return logits, predictions
 
@@ -46,17 +49,35 @@ if __name__ == "__main__":
         num_classes = 200
 
         # build model
-        restore_op, end_points = rebuild_incepv4([batch_size, size, size, 3], training=True)
+        input_layer, restore_op, end_points = rebuild_incepv4([batch_size, size, size, 3], training=True)
         
         # load the weights
         restore_op(sess, ckpt_pth)
 
         # attach new output layer
-        logits, _ = add_fine_tuning_parts(end_points, num_classes)
+        logits, predictions = add_fine_tuning_parts(end_points, num_classes)
 
-        # fine-tune
-        batch_function = 
-        
+        #attach loss function
+        cost = tf.nn.softmax_cross_entropy_with_logits(
+            labels=tf.placeholder(dtype=tf.float32, shape=[batch_size, 200], name='labels'),
+            logits=logits
+        )
+
+        ### Fine-Tune ###
+        # grab variables to fine-tune
+        trainable = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "FineTuning")
+        for var in trainable:
+            sess.run(var.initializer)
+    
+        # define training ops
+        optimizer = tf.train.GradientDescentOptimizer(0.001)
+        train_op = optimizer.minimize(cost, var_list=trainable)
+
+        for i in range(1000):
+            batch = datatool.get_train_batch(batch_size)
+            _, loss = sess.run([train_op, cost], feed_dict={'input:0':batch[0], 'labels:0': batch[1]})
+            print(sum(loss)/len(loss))
+
 
 
 

@@ -7,10 +7,11 @@
 import random
 from os.path import join
 from PIL import Image
+import numpy as np
 
 random.seed(173)
 
-debug = True
+debug = False
 
 data_dir = join('..', 'data')
 train_image_dir = join(data_dir, 'training')
@@ -56,35 +57,60 @@ if debug:
     im = Image.open(join(train_image_dir, train[0][0]))
     im.rotate(45).show()
 
-def get_batch(batch_size, horiz_flip_prob=.5, rotate_prob=.1):
+def preprocess_image(x):
+    x = np.array(x)
+    x = np.divide(x, 255.0) 
+    x = np.subtract(x, 1.0) 
+    x = np.multiply(x, 2.0) 
+    return x
+
+def unprocess_image(x):
+    x = np.divide(x, 2.0)
+    x = np.add(x, 1.0)
+    x = np.multiply(x, 255.0)
+    x = Image.fromarray(x)
+    return x
+
+def get_train_batch(batch_size, horiz_flip_prob=.5, rotate_prob=.2):
     # Grabs a random batch from availiable training data
     # params:
     #   batch_size = the number of training examples to return
     #   horiz_flip_prob (default .5) = probability of doing a horizontal flip
-    #   rotate_prob (default .1) = probability of rotating +/-30 degrees
-    samples = []
-    while len(samples) < batch_size:
+    #   rotate_prob (default .1) = probability of rotating +/-25 degrees
+    samples = [[],[]]
+    while len(samples[0]) < batch_size:
         sample = train[random.randint(0, num_train-1)]
-        image = Image.open(join(train_image_dir, sample[0]))
+        image = Image.open(join(train_image_dir, sample[0])).resize((299, 299), Image.BILINEAR)
         if random.random() < horiz_flip_prob:
             image = image.transpose(Image.FLIP_LEFT_RIGHT)
         if random.random() < rotate_prob:
-            im.rotate(random.randint(-30, 30))
-        label = sample[1]
-        samples.append(image, label)
+            image = image.rotate(random.randint(-25, 25))
+
+        image = preprocess_image(image)
+        label = np.zeros((200))
+        label[sample[1]] = 1
+
+        samples[0].append(image)
+        samples[1].append(label)
     return samples
 
-def get_val(batch_size =-1):
+def get_val_batch(batch_size=-1):
     # Grabs a  batch from availiable validation data
     # params:
     #   batch_size = the number of training examples to return, -1 for all
-    samples = []
-    while len(samples) < batch_size:
+    validx = 0
+    samples = [[],[]]
+    while len(samples[0]) < batch_size:
         if batch_size == -1:
-            sample = val
+            sample = val[validx]
+            validx += 1
         else:
             sample = val[random.randint(0, num_val-1)]
-        image = Image.open(join(train_image_dir, sample[0]))
-        label = sample[1]
-        samples.append(image, label)
+
+        image = preprocess_image(Image.open(join(train_image_dir, sample[0])))
+        label = np.zeros((200))
+        label[sample[1]] = 1
+
+        samples[0].append(image)
+        samples[1].append(label)
     return samples
