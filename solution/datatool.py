@@ -23,7 +23,7 @@ with open(csv_path, 'r') as csv:
     labels = csv.read()
     labels = [i.split(',')[:-1] for i in labels.split('\n')[1:-1]]
     # turn labels frm strings '123' into ints 123
-    labels = [(i[0], int(i[1]))for i in labels]
+    labels = [(i[0], int(i[1])-1) for i in labels]
 
 if debug:
     print('First label is', labels[0])
@@ -80,7 +80,7 @@ def get_train_batch(batch_size, horiz_flip_prob=.5, rotate_prob=.2):
     samples = [[],[]]
     while len(samples[0]) < batch_size:
         sample = train[random.randint(0, num_train-1)]
-        image = Image.open(join(train_image_dir, sample[0])).resize((299, 299), Image.BILINEAR)
+        image = Image.open(join(train_image_dir, sample[0])).resize((299, 299), Image.BILINEAR).convert(mode='RGB')
         if random.random() < horiz_flip_prob:
             image = image.transpose(Image.FLIP_LEFT_RIGHT)
         if random.random() < rotate_prob:
@@ -107,7 +107,9 @@ def get_val_batch(batch_size=-1):
         else:
             sample = val[random.randint(0, num_val-1)]
 
-        image = preprocess_image(Image.open(join(train_image_dir, sample[0])))
+        image = preprocess_image(Image.open(
+                join(train_image_dir, sample[0])
+            ).resize((299, 299), Image.BILINEAR).convert(mode='RGB'))
         label = np.zeros((200))
         label[sample[1]] = 1
 

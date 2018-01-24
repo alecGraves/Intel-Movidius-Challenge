@@ -11,7 +11,7 @@ import datatool
 # model specific info
 from incepv4.inception_v4 import inception_v4
 from incepv4.inception_utils import inception_arg_scope as scope
-size = inception_v4.default_image_size
+size = 299
 ckpt_pth = join('incepv4', 'weights', 'inception_v4.ckpt')
 
 def rebuild_incepv4(input_shape=[1, size, size, 3], training=False):
