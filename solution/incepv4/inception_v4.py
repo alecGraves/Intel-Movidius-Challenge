@@ -300,6 +300,7 @@ def inception_v4(inputs, num_classes=1001, is_training=True,
             aux_logits = slim.conv2d(aux_logits, 768,
                                      aux_logits.get_shape()[1:3],
                                      padding='VALID', scope='Conv2d_2a')
+            aux_logits = slim.dropout(aux_logits, dropout_keep_prob, scope='Dropout_Aux')
             aux_logits = slim.flatten(aux_logits)
             end_points['AuxFlatten'] = aux_logits
             aux_logits = slim.fully_connected(aux_logits, num_classes,

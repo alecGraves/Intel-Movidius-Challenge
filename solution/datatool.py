@@ -94,7 +94,7 @@ def get_train_batch(batch_size, horiz_flip_prob=.5, rotate_prob=.2):
         samples[1].append(label)
     return samples
 
-def get_val_batch(batch_size=-1):
+def get_val(batch_size=-1):
     # Grabs a  batch from availiable validation data
     # params:
     #   batch_size = the number of training examples to return, -1 for all
