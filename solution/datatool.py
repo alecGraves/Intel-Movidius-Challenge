@@ -58,7 +58,7 @@ if debug:
     im.rotate(45).show()
 
 def preprocess_image(x):
-    x = x.astype(x, float32)
+    x = x.astype(np.float32)
     x = np.array(x)
     x = np.divide(x, 255.0) 
     x = np.subtract(x, 1.0) 
@@ -69,7 +69,7 @@ def unprocess_image(x):
     x = np.divide(x, 2.0)
     x = np.add(x, 1.0)
     x = np.multiply(x, 255.0)
-    x = x.astype(x, uint8)
+    x = x.astype(np.uint8)
     x = Image.fromarray(x)
     return x
 
