@@ -61,13 +61,13 @@ def preprocess_image(x):
     x = x.astype(np.float32)
     x = np.array(x)
     x = np.divide(x, 255.0) 
-    x = np.subtract(x, 1.0) 
+    x = np.subtract(x, 0.5) 
     x = np.multiply(x, 2.0) 
     return x
 
 def unprocess_image(x):
     x = np.divide(x, 2.0)
-    x = np.add(x, 1.0)
+    x = np.add(x, 0.5)
     x = np.multiply(x, 255.0)
     x = x.astype(np.uint8)
     x = Image.fromarray(x)
