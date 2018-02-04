@@ -10,3 +10,23 @@ In this challenge you will be pushing your network training skills to its limits
 
 ## Your Objective
 Your task is to design and fine-tune a convolutional neural network (CNN) which can classify images among a predefined set of image labels. The neural network should be deployed on the Intel Movidius Neural Compute Stick for inference purpose. NCSDK provides the tools to convert your pre-trained CNN to a binary file which can be deployed to NCS.
+
+# Submission:
+1. Retrain
+2. Validate model graph accuracy
+```
+mvNCCheck meta/network.meta -w meta/network -in=input -on=FineTuning/FineTuning -s12 -is 299 299  -i topcoder_example/data/provisional/provisional_00001.jpg -S 0.05 -M -1 -cs 0,1,2
+```
+2. build the movidius graph file from meta and weights:
+```
+mvNCCompile meta/network.meta -w meta/network -in=input -on=FineTuning/FineTuning/BiasAdd -s12 -is 299 299  -o compiled.graph
+```
+3. Run provided inference script to get inferences.csv
+```
+python inferences.py "~/data"
+```
+4. zip files and post to onedrive for download link
+- network.meta
+- compiled.graph
+- inferences.csv
+- supported/
