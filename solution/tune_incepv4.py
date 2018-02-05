@@ -22,11 +22,11 @@ ckpt_pth = join('incepv4', 'weights', 'inception_v4.ckpt')
 
 debug = True
 
-def rebuild_incepv4(input_shape=[1, size, size, 3], training=False):
+def rebuild_incepv4(input_shape=[1, size, size, 3], training=False, dropout_keep_prob=1):
     # build the model, get loadable vars
     with slim.arg_scope(scope()):
         input_layer = tf.placeholder(shape=input_shape, dtype=tf.float32, name='input')
-        logits, end_points = inception_v4(input_layer, is_training=training, create_aux_logits=False)
+        logits, end_points = inception_v4(input_layer, is_training=training, create_aux_logits=True, dropout_keep_prob=dropout_keep_prob)
         vars_to_restore = slim.get_variables_to_restore()
 
     # save the op used to restore weights from checkpoint
@@ -34,12 +34,15 @@ def rebuild_incepv4(input_shape=[1, size, size, 3], training=False):
 
 def add_fine_tuning_parts(end_points, num_classes=200):
     # grab the network output
-    flattened = end_points['PreLogitsFlatten']
+    aux = end_points['AuxFlatten']
+    avg = end_points['PreLogitsFlatten']
 
     with tf.variable_scope('FineTuning'):
+        flattened = tf.concat([aux, avg], axis=-1)
         logits = slim.fully_connected(flattened, num_classes, activation_fn=None,
                                         scope='FineTuning')
         predictions = tf.nn.softmax(logits, name='PredictionsFine')
+    output = tf.identity(logits, name='logits')
 
     return logits, predictions
 
@@ -103,6 +106,7 @@ if __name__ == "__main__":
             writer.add_summary(summary, batch_start)
             return data
         
+        val_loss_record = []
         # set up training function
         def train(batch_start, num_batches, learning_rate):
             with tf.variable_scope('Optimizer'  +str(batch_start)):
@@ -116,7 +120,11 @@ if __name__ == "__main__":
                 _, summary = sess.run([train_op, log_train], feed_dict={'input:0':batch[0], 'labels:0': batch[1]})
                 writer.add_summary(summary, batch_start + i)
                 if i == 0 or(i % 10) == 0:
-                    print(i, 'val_loss:', val_loss(i+batch_start))
+                    val_loss_record.append(val_loss(i+batch_start))
+                    print(i, 'val_loss:', val_loss_record[-1])
+                    if i > 300 and val_loss_record[-1] < min(val_loss_record[:-1]):
+                        print('saving best')
+                        fine_tuned_saver.save(sess, join(save_path, 'inception_v4_299_tuned_ncs_BEST.ckpt'), )
                 
 
         # Start training

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+# Some modifications made from oritional source file
+# ==============================================================================
 """Contains the definition of the Inception V4 architecture.
 
 As described in http://arxiv.org/abs/1602.07261.
@@ -300,7 +302,8 @@ def inception_v4(inputs, num_classes=1001, is_training=True,
             aux_logits = slim.conv2d(aux_logits, 768,
                                      aux_logits.get_shape()[1:3],
                                      padding='VALID', scope='Conv2d_2a')
-            # aux_logits = slim.dropout(aux_logits, dropout_keep_prob, scope='Dropout_Aux')
+            if dropout_keep_prob != 1:                 
+              aux_logits = slim.dropout(aux_logits, dropout_keep_prob, scope='Dropout_Aux')
             aux_logits = slim.flatten(aux_logits)
             end_points['AuxFlatten'] = aux_logits
             aux_logits = slim.fully_connected(aux_logits, num_classes,
@@ -324,7 +327,8 @@ def inception_v4(inputs, num_classes=1001, is_training=True,
           if not num_classes:
             return net, end_points
           # 1 x 1 x 1536
-          # net = slim.dropout(net, dropout_keep_prob, scope='Dropout_1b')
+          if dropout_keep_prob != 1:
+            net = slim.dropout(net, dropout_keep_prob, scope='Dropout_1b')
           net = slim.flatten(net, scope='PreLogitsFlatten')
           end_points['PreLogitsFlatten'] = net
           # 1536
