@@ -51,13 +51,13 @@ if __name__ == "__main__":
     with tf.Session(config=config) as sess:
         # view checkpoint
         # print_tensors_in_checkpoint_file(ckpt_pth, None, False)
-
-        batch_size = 64
+        
+        batch_size = 8
         num_classes = 200
 
         if debug:
             print('Rebuilding model...')
-        incep_vars, end_points = rebuild_incepv4([batch_size, size, size, 3], training=False, dropout_keep_prob=.9)
+        incep_vars, end_points = rebuild_incepv4([batch_size, size, size, 3], training=True, dropout_keep_prob=.9)
         
         if debug:
             print('Attaching new final layer...')
@@ -100,16 +100,14 @@ if __name__ == "__main__":
         fine_tuned_saver = tf.train.Saver()
         fine_tuned_saver.save(sess, join(save_path, 'inception_v4_save_test.ckpt'))
 
+        fine_tuned_saver.restore(sess, join(save_path, 'run7', 'inception_v4_299_tuned_ncs_BEST0.6397403478622437.ckpt'))
+
         # set up valitaion error checking function
         def val_loss(batch_start):
             val = datatool.get_val()
-            data = []
-            for i in range(len(val)//batch_size):
-                idx = i*batch_size:i*batch_size+batch_size
-                d, summary = sess.run([loss_data, log_val], feed_dict={'input:0':val[0][idx], 'labels:0': val[1][idx]})
-                data.append(d)
+            data, summary = sess.run([loss_data, log_val], feed_dict={'input:0':val[0], 'labels:0': val[1]})
             writer.add_summary(summary, batch_start)
-            return sum(data)/len(data)
+            return data
 
         
         # set up training function
@@ -129,7 +127,7 @@ if __name__ == "__main__":
                 batch = datatool.get_train_batch(batch_size)
                 _, summary = sess.run([train_op, log_train], feed_dict={'input:0':batch[0], 'labels:0': batch[1]})
                 writer.add_summary(summary, batch_start + i)
-                if (i % 20) == 0:
+                if (i % 10) == 0:
                     val_loss_current = val_loss(i+batch_start)
                     print(i, 'val_loss:',val_loss_current, 'saved:', val_loss_saved)
                     last += 1
@@ -144,15 +142,15 @@ if __name__ == "__main__":
         epoch = datatool.num_train//batch_size
         print('training stage 0...')
         pos = 0
-        num = epoch//2
-        train(pos, num, learning_rate=0.001)
-        pos += num
+        # num = epoch//2
+        # train(pos, num, learning_rate=0.001)
+        # pos += num
         num = epoch
 
         schedule = [0.0001, 0.000093, 0.000084, 0.000073]
         for i, lr in enumerate(schedule):
             print('training stage {}...'.format(i+1))
-            train(pos, num, lr)
+            train(pos, num, lr, False)
             pos += num
 
         # for i, lr in enumerate(schedule):

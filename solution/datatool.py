@@ -6,11 +6,13 @@
 ##########################################################
 import random
 from os.path import join
-from PIL import Image
+import cv2
 import numpy as np
 
-random.seed(173)
+random.seed(13037)
 
+
+BATCH_SIZE = 8
 debug = False
 
 data_dir = join('..', 'data')
@@ -28,22 +30,17 @@ with open(csv_path, 'r') as csv:
 if debug:
     print('First label is', labels[0])
 
-num_val = int(.005*len(labels))
+num_val = 32
 val = labels[-num_val:]
 assert num_val == len(val)
 
-num_test = num_val
-test = labels[-2*num_val:-num_val]
-assert num_test == len(test)
-
-num_train = len(labels) - 2*num_val
+num_train = len(labels) - num_val
 train = labels[:num_train]
 assert num_train == len(train)
 
 if debug:
     print('There are', len(labels), 'labels.')
-    print('Reserving', num_train, 'labels for trainin')
-    print('Reserving', num_test, 'labels for validation')
+    print('Reserving', num_train, 'labels for training')
     print('Reserving', num_val, 'labels for testing')
 
 # explore number of each category(they are all 400 samples)
@@ -53,9 +50,9 @@ if debug:
 # print(max(label_baskets))
 # print(min(label_baskets))
 
-if debug:
-    im = Image.open(join(train_image_dir, train[0][0]))
-    im.rotate(45).show()
+# if debug: # removed PIL, will no longer work.
+#     im = Image.open(join(train_image_dir, train[0][0]))
+#     im.rotate(45).show()
 
 def preprocess_image(x):
     x = np.array(x).astype(np.float32)
@@ -70,23 +67,30 @@ def unprocess_image(x):
     x = np.add(x, 0.5)
     x = np.multiply(x, 255.0)
     x = x.astype(np.uint8)
-    x = Image.fromarray(x)
     return x
 
-def get_train_batch(batch_size, horiz_flip_prob=.5, rotate_prob=.2):
+TRAIN_IDX = 0
+def get_train_batch(batch_size, horiz_flip_prob=.5, cutout=True):
     # Grabs a random batch from availiable training data
     # params:
     #   batch_size = the number of training examples to return
     #   horiz_flip_prob (default .5) = probability of doing a horizontal flip
-    #   rotate_prob (default .1) = probability of rotating +/-25 degrees
+    global TRAIN_IDX
     samples = [[],[]]
     while len(samples[0]) < batch_size:
-        sample = train[random.randint(0, num_train-1)]
-        image = Image.open(join(train_image_dir, sample[0])).resize((299, 299), Image.BILINEAR).convert(mode='RGB')
+        sample = train[TRAIN_IDX]
+        TRAIN_IDX = (TRAIN_IDX + 1) % num_train
+        image = cv2.imread(join(train_image_dir, sample[0]))
+        image = cv2.resize(image, (299,299))
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         if random.random() < horiz_flip_prob:
-            image = image.transpose(Image.FLIP_LEFT_RIGHT)
-        if random.random() < rotate_prob:
-            image = image.rotate(random.randint(-25, 25))
+            image = cv2.flip(image, 1)
+
+        if cutout:
+            cutsize = [image.shape[0]//3, image.shape[1]//3]
+            x_offset = random.randint(0, image.shape[0]-cutsize[0])
+            y_offset = random.randint(0, image.shape[1]-cutsize[1])
+            image[x_offset:cutsize[0], y_offset:cutsize[1], :] = [127, 127, 127]
 
         image = preprocess_image(image)
         label = np.zeros((200))
@@ -96,22 +100,20 @@ def get_train_batch(batch_size, horiz_flip_prob=.5, rotate_prob=.2):
         samples[1].append(label)
     return samples
 
-def get_val(batch_size=-1):
+def get_val():
     # Grabs a  batch from availiable validation data
     # params:
-    #   batch_size = the number of training examples to return, -1 for all
     validx = 0
     samples = [[],[]]
-    while len(samples[0]) < batch_size:
-        if batch_size == -1:
-            sample = val[validx]
-            validx += 1
-        else:
-            sample = val[random.randint(0, num_val-1)]
+    while len(samples[0]) < BATCH_SIZE:
+        sample = val[validx]
+        validx += 1
+                
+        image = cv2.imread(join(train_image_dir, sample[0]))
+        image = cv2.resize(image, (299,299))
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = preprocess_image(image)
 
-        image = preprocess_image(Image.open(
-                join(train_image_dir, sample[0])
-            ).resize((299, 299), Image.BILINEAR).convert(mode='RGB'))
         label = np.zeros((200))
         label[sample[1]] = 1
 

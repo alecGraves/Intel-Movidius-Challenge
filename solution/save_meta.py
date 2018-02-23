@@ -3,35 +3,29 @@ import tensorflow as tf
 import numpy as np
 from tune_incepv4 import rebuild_incepv4, add_fine_tuning_parts, scope, slim, inception_v4
 
-finetuned_path =  join('incepv4', 'finetuned', 'weights', 'inception_v4_299_tuned_ncs.ckpt')
+finetuned_path =  join('incepv4', 'finetuned', 'weights', 'run7', 'inception_v4_299_tuned_ncs_BEST0.6397403478622437.ckpt')
 output_meta_path = join('incepv4', 'finetuned', 'meta', 'network')
 
+num_classes = 200
+size = 299
+batch_size = 1
+
 # Load origional inceptionv4 model
-with slim.arg_scope(scope()):
-    input_layer = tf.placeholder(shape=[1, 299, 299, 3], dtype=tf.float32, name='input')
-    logits, end_points = inception_v4(input_layer, is_training=False, create_aux_logits=False)
-    vars_to_restore = slim.get_variables_to_restore()
-flattened = end_points['PreLogitsFlatten']
+incep_vars, end_points = rebuild_incepv4([batch_size, size, size, 3], training=False, dropout_keep_prob=1) # do not add dropout layers
+
 
 # add finetuning computations
-with tf.variable_scope('FineTuning'):
-    logits = slim.fully_connected(flattened, 200, activation_fn=None,
-                                    scope='FineTuning')
-    predictions = tf.nn.softmax(logits, name='PredictionsFine')
- 
+logits, predictions = add_fine_tuning_parts(end_points, num_classes)
+
 with tf.Session() as sess:
-    # restore vars from checkpoint
-    # fine_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, 'FineTuning')
-    # vars = vars_to_restore + fine_vars
-    # saver = tf.train.Saver(vars)
 
     saver = tf.train.Saver()
 
     saver.restore(sess, finetuned_path)
 
     # Test execution of the model
-    preds = sess.run(predictions, feed_dict={'input:0': np.random.random([1, 299, 299, 3])})
-    print(preds)    
+    preds = sess.run(predictions, feed_dict={'input:0': np.random.random([batch_size, size, size, 3])})
+    print(preds)
 
     # save model and weights in meta folder
     saver.save(sess, output_meta_path)
@@ -39,6 +33,3 @@ with tf.Session() as sess:
     filename=output_meta_path + '.meta',
     clear_devices=True,
     clear_extraneous_savers=True)
-
-
-print('run "mvNCCompile {0} -in=input -on=FineTuning/PredictionsFine -s12" to compile'.format(output_meta_path+'.meta'))
