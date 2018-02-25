@@ -41,9 +41,12 @@ model = Model(inputs=base_model.input, outputs=predictions)
 for layer in base_model.layers:
     layer.trainable = False
 
-model.summary()
+# view number of layers
+# for i, layer in enumerate(base_model.layers):
+#    print(i, layer.name)
+# exit()
 
-cb = callbacks.ModelCheckpoint('./weights/keras/model.h5', monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto', period=1)
+cb = callbacks.ModelCheckpoint('./weights/keras/model.h5')
 
 model.compile(loss='categorical_crossentropy',
             optimizer='rmsprop')
@@ -52,7 +55,21 @@ model.fit_generator(
     datatool.train_gen(batch_size),
     validation_data=datatool.val_gen(batch_size),
     validation_steps=datatool.num_val//batch_size,
-    steps_per_epoch=20,#datatool.num_train//batch_size,
+    steps_per_epoch=datatool.num_train//batch_size,
     callbacks=[cb],
     epochs=5)
 
+for layer in base_model.layers[-40:]:
+    layer.trainable = True
+
+sgd = optimizers.SGD(lr=0.0001, momentum=0.9)
+model.compile(loss=sgd,
+            optimizer='rmsprop')
+
+model.fit_generator(
+    datatool.train_gen(batch_size),
+    validation_data=datatool.val_gen(batch_size),
+    validation_steps=datatool.num_val//batch_size,
+    steps_per_epoch=datatool.num_train//batch_size,
+    callbacks=[cb],
+    epochs=5)
