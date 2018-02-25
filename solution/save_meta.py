@@ -3,7 +3,7 @@ import tensorflow as tf
 import numpy as np
 from tune_incepv4 import rebuild_incepv4, add_fine_tuning_parts, scope, slim, inception_v4
 
-finetuned_path =  join('incepv4', 'finetuned', 'weights', 'run7', 'inception_v4_299_tuned_ncs_BEST0.6397403478622437.ckpt')
+finetuned_path =  join('incepv4', 'finetuned', 'weights', 'inception_v4_299_tuned_ncs_BEST206.ckpt')
 output_meta_path = join('incepv4', 'finetuned', 'meta', 'network')
 
 num_classes = 200
@@ -24,7 +24,7 @@ with tf.Session() as sess:
     saver.restore(sess, finetuned_path)
 
     # Test execution of the model
-    preds = sess.run(predictions, feed_dict={'input:0': np.random.random([batch_size, size, size, 3])})
+    preds = sess.run(predictions, feed_dict={'input:0': np.random.random([batch_size, size, size, 3])-0.5})
     print(preds)
 
     # save model and weights in meta folder

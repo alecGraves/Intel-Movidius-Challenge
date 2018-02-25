@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
         if debug:
             print('Rebuilding model...')
-        incep_vars, end_points = rebuild_incepv4([batch_size, size, size, 3], training=True, dropout_keep_prob=.9)
+        incep_vars, end_points = rebuild_incepv4([batch_size, size, size, 3], training=False, dropout_keep_prob=.9)
         
         if debug:
             print('Attaching new final layer...')
@@ -97,17 +97,22 @@ if __name__ == "__main__":
         initialize('Logging')
         # test save
         save_path =  join('incepv4', 'finetuned', 'weights')
-        fine_tuned_saver = tf.train.Saver()
+        fine_tuned_saver = tf.train.Saver(max_to_keep=None)
         fine_tuned_saver.save(sess, join(save_path, 'inception_v4_save_test.ckpt'))
 
-        fine_tuned_saver.restore(sess, join(save_path, 'run7', 'inception_v4_299_tuned_ncs_BEST0.6397403478622437.ckpt'))
+        fine_tuned_saver.restore(sess, join(save_path, 'run7', 'inception_v4_299_tuned_ncs_BEST661.ckpt'))
 
         # set up valitaion error checking function
         def val_loss(batch_start):
             val = datatool.get_val()
-            data, summary = sess.run([loss_data, log_val], feed_dict={'input:0':val[0], 'labels:0': val[1]})
-            writer.add_summary(summary, batch_start)
-            return data
+            data = []
+            for i in range(len(val[0])//batch_size):
+                idx_s = i*batch_size
+                idx_e = i*batch_size+batch_size
+                d, summary = sess.run([loss_data, log_val], feed_dict={'input:0':val[0][idx_s:idx_e], 'labels:0': val[1][idx_s:idx_e]})
+                data.append(d)
+            # writer.add_summary(summary, batch_start)
+            return sum(data)/len(data)
 
         
         # set up training function
@@ -117,9 +122,11 @@ if __name__ == "__main__":
             with tf.variable_scope('Optimizer'  +str(batch_start)):
                 optimizer = tf.train.AdamOptimizer(learning_rate)
                 if trainable_only:
-                    train_op = optimizer.minimize(cost, var_list=trainable)
+                    train_op = slim.learning.create_train_op(cost, optimizer)
+                    # train_op = optimizer.minimize(cost, var_list=trainable)
+                    # slim.create_train_op
                 else:
-                    train_op = optimizer.minimize(cost)
+                    train_op = slim.learning.create_train_op(cost, optimizer)
             opt = initialize("Optimizer" + str(batch_start))
 
             # do training loop
@@ -127,7 +134,7 @@ if __name__ == "__main__":
                 batch = datatool.get_train_batch(batch_size)
                 _, summary = sess.run([train_op, log_train], feed_dict={'input:0':batch[0], 'labels:0': batch[1]})
                 writer.add_summary(summary, batch_start + i)
-                if (i % 10) == 0:
+                if (i % 20) == 0:
                     val_loss_current = val_loss(i+batch_start)
                     print(i, 'val_loss:',val_loss_current, 'saved:', val_loss_saved)
                     last += 1
@@ -136,17 +143,20 @@ if __name__ == "__main__":
                         val_loss_saved = val_loss_current
                         print('saving best')
                         fine_tuned_saver.save(sess, join(save_path, 'inception_v4_299_tuned_ncs_BEST{}.ckpt'.format(int(val_loss_current*1000))))
-                
+
 
         # Start training
         epoch = datatool.num_train//batch_size
         print('training stage 0...')
         pos = 0
+
         # num = epoch//2
         # train(pos, num, learning_rate=0.001)
         # pos += num
+
         num = epoch
 
+        # schedule = [0.0001, 0.000093, 0.000084, 0.000073]
         schedule = [0.0001, 0.000093, 0.000084, 0.000073]
         for i, lr in enumerate(schedule):
             print('training stage {}...'.format(i+1))
