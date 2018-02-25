@@ -12,7 +12,6 @@ import numpy as np
 random.seed(13037)
 
 
-BATCH_SIZE = 8
 debug = False
 
 data_dir = join('..', 'data')
@@ -30,7 +29,7 @@ with open(csv_path, 'r') as csv:
 if debug:
     print('First label is', labels[0])
 
-num_val = 32
+num_val = 512
 val = labels[-num_val:]
 assert num_val == len(val)
 
@@ -87,7 +86,8 @@ def get_train_batch(batch_size, horiz_flip_prob=.5, cutout=True):
             image = cv2.flip(image, 1)
 
         if cutout:
-            cutsize = [image.shape[0]//3, image.shape[1]//3]
+            cutout_scale = .4
+            cutsize = [int(image.shape[0]*cutout_scale), int(image.shape[1]*cutout_scale)]
             x_offset = random.randint(0, image.shape[0]-cutsize[0])
             y_offset = random.randint(0, image.shape[1]-cutsize[1])
             image[x_offset:cutsize[0], y_offset:cutsize[1], :] = [127, 127, 127]
@@ -98,16 +98,17 @@ def get_train_batch(batch_size, horiz_flip_prob=.5, cutout=True):
 
         samples[0].append(image)
         samples[1].append(label)
-    return samples
+    return (np.array(samples[0]), np.array(samples[1]))
 
-def get_val():
+validx = 0
+def get_val(batch_size):
     # Grabs a  batch from availiable validation data
     # params:
-    validx = 0
+    global validx
     samples = [[],[]]
-    while len(samples[0]) < BATCH_SIZE:
+    while len(samples[0]) < batch_size:
         sample = val[validx]
-        validx += 1
+        validx = (validx + 1) % num_val
                 
         image = cv2.imread(join(train_image_dir, sample[0]))
         image = cv2.resize(image, (299,299))
@@ -119,4 +120,4 @@ def get_val():
 
         samples[0].append(image)
         samples[1].append(label)
-    return samples
+    return (np.array(samples[0]), np.array(samples[1]))
