@@ -56,7 +56,7 @@ def _finetune():
         # view checkpoint
         # print_tensors_in_checkpoint_file(ckpt_pth, None, False)
         
-        batch_size = 16
+        batch_size = 8
         num_classes = 200
         epoch = datatool.num_train//batch_size
 
@@ -119,7 +119,7 @@ def _finetune():
         def val_loss(batch_start):
             avg = []
             for i in range(datatool.num_val//batch_size):
-                val = datatool.get_val()
+                val = datatool.get_val(batch_size)
                 data, summary = sess.run([loss_data, log_val], feed_dict={'input:0':val[0], 'labels:0': val[1]})
                 writer.add_summary(summary, batch_start+i)
                 avg.append(data)
