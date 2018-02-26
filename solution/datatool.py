@@ -29,7 +29,7 @@ with open(csv_path, 'r') as csv:
 if debug:
     print('First label is', labels[0])
 
-num_val = 512
+num_val = 256
 val = labels[-num_val:]
 assert num_val == len(val)
 

@@ -56,12 +56,12 @@ def _finetune():
         # view checkpoint
         # print_tensors_in_checkpoint_file(ckpt_pth, None, False)
         
-        batch_size = 64
+        batch_size = 16
         num_classes = 200
         epoch = datatool.num_train//batch_size
 
         print('Rebuilding model...')
-        incep_vars, end_points = rebuild_incepv4([batch_size, size, size, 3], training=False, dropout_keep_prob=.6)
+        incep_vars, end_points = rebuild_incepv4([batch_size, size, size, 3], training=False, dropout_keep_prob=.9)
         
         print('Attaching new final layer...')
         logits, predictions = add_fine_tuning_parts(end_points, num_classes)
@@ -110,27 +110,30 @@ def _finetune():
             writer =  tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
         initialize('Logging')
         # test save
+        save_path =  join('incepv4', 'finetuned', 'weights')
         fine_tuned_saver = tf.train.Saver(max_to_keep=None)
         fine_tuned_saver.save(sess, join(save_path, 'inception_v4_save_test.ckpt'))
 
 
         # set up valitaion error checking function
         def val_loss(batch_start):
-            val = datatool.get_val(batch_size)
-            data, summary = sess.run([loss_data, log_val], feed_dict={'input:0':val[0], 'labels:0': val[1]})
-            writer.add_summary(summary, batch_start)
-            return data
-        
+            avg = []
+            for i in range(datatool.num_val//batch_size):
+                val = datatool.get_val()
+                data, summary = sess.run([loss_data, log_val], feed_dict={'input:0':val[0], 'labels:0': val[1]})
+                writer.add_summary(summary, batch_start+i)
+                avg.append(data)
+            return sum(avg)/len(avg)
+
         # set up training function
         def train(batch_start, num_batches, learning_rate, new_layers_only=True):
             global val_loss_saved
             last = 2
             with tf.variable_scope('Optimizer'  +str(batch_start)):
+                optimizer = tf.train.AdamOptimizer(learning_rate)
                 if new_layers_only:
-                    optimizer = tf.train.RMSPropOptimizer(learning_rate)
                     train_op = optimizer.minimize(cost, var_list=new_layers)
                 else:
-                    optimizer = tf.train.GradientDescentOptimizer(learning_rate)
                     train_op = optimizer.minimize(cost, var_list=last_layers)
             opt = initialize("Optimizer" + str(batch_start))
 
@@ -139,14 +142,15 @@ def _finetune():
                 batch = datatool.get_train_batch(batch_size)
                 _lossvalue, _, summary = sess.run([loss_data, train_op, log_train], feed_dict={'input:0':batch[0], 'labels:0': batch[1]})
                 if (i%10)==0:
-                    print(i, '/', epoch, _lossvalue)
+                    print(i, '/', num_batches, _lossvalue)
                     writer.add_summary(summary, batch_start + i)
-            val_loss_current = val_loss(i+batch_start)
-            print(i, 'val_loss:',val_loss_current, 'saved:', val_loss_saved)
-            if (val_loss_current < val_loss_saved): # saves best
-                val_loss_saved = val_loss_current
-                print('******saving best')
-                fine_tuned_saver.save(sess, join(save_path, 'inception_v4_299_tuned_ncs_BEST{}.ckpt'.format(int(val_loss_current*10000))))
+                if (i % 1000) == 0:
+                    val_loss_current = val_loss(i+batch_start)
+                    print(i, 'val_loss:',val_loss_current, 'saved:', val_loss_saved)
+                    if (val_loss_current < val_loss_saved): # saves best
+                        val_loss_saved = val_loss_current
+                        print('******saving best')
+                        fine_tuned_saver.save(sess, join(save_path, 'inception_v4_299_tuned_ncs_BEST{}.ckpt'.format(int(val_loss_current*10000))))
                 
 
         # Start training
@@ -155,11 +159,9 @@ def _finetune():
         num = epoch
         # first start by training one epoch
         # and updating weights for only the last fully connected layer.
-        schedule = [0.001, 0.0005]
-        for i, lr in enumerate(schedule):
-            print('training stage {}...'.format(i+1))
-            train(pos, num, 0.001, True)
-            pos += num
+        train(pos, num, 0.001, True)
+        pos += num
+
 
         schedule = [0.0001, 0.000093, 0.000084, 0.000073]
         for i, lr in enumerate(schedule):
